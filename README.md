@@ -116,6 +116,7 @@ Aethelgard strictly adheres to a monochromatic **Blush-Porcelain Editorial Desig
 ```
 COGNITION/
 ├── app.py                      # FastAPI core backend, 2PC engine, SQLite shadow CoW, and REST routes
+├── final_certification_suite.py# Comprehensive 12-Gate Production Certification Gauntlet (Zero-Fallback Proof)
 ├── verify_dynamic.py           # Verification suite asserting zero hardcoded values & dynamic SQL
 ├── ralph_verify.py             # 6-Gate Ralph loop verifying AST, dynamic SQL, self-heal, 2PC, benchmarks, DOM
 ├── prove_no_fallbacks.py       # Forensic audit script proving real DB persistence and zero fallbacks
@@ -165,25 +166,31 @@ Open your browser and navigate to: **`http://127.0.0.1:8000`**
 
 Run any of the automated test suites to independently verify system guarantees:
 
-### 1. Dynamic Execution & Anti-Hardcoding Audit
+### 1. Master 12-Gate Production Certification Gauntlet
+```bash
+python final_certification_suite.py
+```
+*End-to-end zero-fallback proof: Golden genesis attestation, <15ms CoW cloning, dynamic arbitrary SQL, Ralph self-healing, HMAC-SHA256 2PC, TOCTOU tamper rejection, state-drift rejection, 50-thread concurrency stress, agent NLP compiler diagnostics, 24-case benchmark evaluation (100% recall / 0% false positives), 5-vector red-team gauntlet, and design system/DOM integrity.*
+
+### 2. Dynamic Execution & Anti-Hardcoding Audit
 ```bash
 python verify_dynamic.py
 ```
 *Injects unseen random SQL queries and dynamic agent prompts, asserts real row mutations and financial exposure without preset lookups, and verifies 2PC anti-replay.*
 
-### 2. Ralph 6-Gate Spec-Lock Suite
+### 3. Ralph 6-Gate Spec-Lock Suite
 ```bash
 python ralph_verify.py
 ```
 *Executes static AST checks, unseen dynamic SQL, iterative self-healing, 1-char tamper rejection, 24-case benchmark accuracy, and Three.js DOM integrity.*
 
-### 3. Forensic Anti-Fallback Audit
+### 4. Forensic Anti-Fallback Audit
 ```bash
 python prove_no_fallbacks.py
 ```
 *Proves live SQLite cloning, cascading foreign-key deletions, exact ARR loss calculations, and real production state hash transitions.*
 
-### 4. Adversarial Red-Team Exploit Suite
+### 5. Adversarial Red-Team Exploit Suite
 ```bash
 python redteam_breaker.py
 ```

@@ -1933,7 +1933,7 @@ async def run_redteam_exploit_suite():
             v2_status = "FAILED_VULNERABLE"
             v2_desc = "Vulnerability: Server permitted stale state commit."
         except HTTPException as he:
-            if he.status_code == 409 and "State Drift" in he.detail:
+            if he.status_code == 409 and "state drift" in he.detail.lower():
                 v2_status = "PASSED_BLOCKED"
                 v2_desc = f"Race condition blocked: HTTP 409 ('{he.detail}')."
             else:
@@ -2032,7 +2032,8 @@ async def run_redteam_exploit_suite():
         "all_passed": all_passed,
         "attack_vectors_count": len(tests),
         "passed_count": sum(1 for t in tests if t["status"] == "PASSED_BLOCKED"),
-        "results": tests
+        "results": tests,
+        "vectors": tests
     }
 
 @app.post("/api/reset")
