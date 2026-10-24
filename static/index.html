@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aethelgard — AI Action Simulator & Safety Gate</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <!-- Three.js (r128) via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <!-- TOP NAVIGATION BAR (56px) -->
+    <header class="top-nav">
+      <div class="nav-left">
+        <h1 class="nav-brand">AETHELGARD</h1>
+        <span class="nav-subtitle">Simulate AI actions safely before they happen in real life.</span>
+      </div>
+
+      <div class="kbd-shortcuts-bar" title="Instant Keyboard Controls">
+        <span><span class="kbd-key">1</span>Simulate</span>
+        <span><span class="kbd-key">2</span>Auto-Fix</span>
+        <span><span class="kbd-key">3</span>Commit</span>
+        <span><span class="kbd-key">R</span>Reset</span>
+        <span><span class="kbd-key">Esc</span>Close</span>
+      </div>
+
+      <div class="nav-right">
+        <button class="nav-pill-btn" onclick="openDatabaseModal()">[ View Live Database ]</button>
+        <button class="nav-pill-btn" onclick="openBenchmarkDrawer()">[ 24-Test Accuracy Scorecard ]</button>
+        <button class="nav-pill-btn nav-reset-btn" onclick="resetSystemState()">[ Reset Demo ]</button>
+      </div>
+    </header>
+
+    <!-- MAIN 2-COLUMN INTERACTIVE WORKSPACE -->
+    <main class="main-layout">
+      <!-- LEFT PANEL (36% Width) — 3-Step Human Flow -->
+      <aside class="left-panel">
+        <!-- STEP 1: Choose Action -->
+        <section class="step-card">
+          <div class="step-badge-row">
+            <span class="step-number">STEP 1</span>
+            <span class="step-title">Choose What the AI Wants to Do</span>
+          </div>
+
+          <!-- Natural-Language Autonomous Agent Command Bar -->
+          <div class="agent-command-section">
+            <label class="agent-command-label" for="agent-task-input">Give the Autonomous Agent a Task:</label>
+            <div class="agent-input-row">
+              <input type="text" id="agent-task-input" class="agent-input-field" placeholder="e.g., Delete inactive trial users and refund their stuck charges..." onkeydown="if(event.key==='Enter') dispatchAgentTask()">
+              <button class="dispatch-agent-btn" id="btn-dispatch-agent" onclick="dispatchAgentTask()">[ Dispatch Agent ]</button>
+            </div>
+            <!-- Compact 3-Step Live Reasoning Trace -->
+            <div class="agent-trace-strip" id="agent-trace-strip" style="display: none;">
+              <div class="trace-line" id="trace-step-1"><span class="trace-num">1.</span> <span id="trace-text-1">Agent Goal Parsed</span></div>
+              <div class="trace-line" id="trace-step-2"><span class="trace-num">2.</span> <span id="trace-text-2">Tool Selected</span></div>
+              <div class="trace-line" id="trace-step-3"><span class="trace-num">3.</span> <span id="trace-text-3">Intercepted by Aethelgard Sandbox Gate</span></div>
+            </div>
+          </div>
+
+          <div class="quick-examples-header">
+            <span class="quick-examples-label">OR CHOOSE QUICK 1-CLICK EXAMPLES</span>
+          </div>
+
+          <!-- Category Pills -->
+          <div class="category-tabs">
+            <button class="cat-btn active" id="cat-sql" onclick="switchCategory('CODE & SQL DEPLOY')">Database & Code</button>
+            <button class="cat-btn" id="cat-pay" onclick="switchCategory('PAYMENT LEDGER')">Payments</button>
+            <button class="cat-btn" id="cat-eml" onclick="switchCategory('OUTBOUND EMAIL')">Emails</button>
+          </div>
+
+          <!-- 3 Scenario Cards (Populated Dynamically) -->
+          <div class="scenario-cards-wrap" id="scenario-cards-container">
+            <!-- Rendered by app.js -->
+          </div>
+
+          <!-- Collapsible Custom Code / Message Toggle -->
+          <button class="toggle-code-btn" id="btn-toggle-code" onclick="toggleCustomCodeBox()">
+            <span id="toggle-code-icon">+</span>
+            <span id="toggle-code-text">Write or Edit Custom Code / Message</span>
+          </button>
+
+          <div class="custom-code-box" id="custom-code-box" style="display: none;">
+            <div class="code-box-header">
+              <span id="custom-box-title">RAW ACTION PAYLOAD</span>
+              <span id="payload-byte-counter">0 BYTES</span>
+            </div>
+            <textarea id="payload-editor" class="clean-textarea" spellcheck="false" placeholder="Type custom SQL, JSON payment, or email text..."></textarea>
+          </div>
+        </section>
+
+        <!-- STEP 2: Test & Fix -->
+        <section class="step-card">
+          <div class="step-badge-row">
+            <span class="step-number">STEP 2</span>
+            <span class="step-title">Test & Fix in the Simulator</span>
+          </div>
+
+          <div class="action-buttons-row">
+            <button class="action-btn action-btn-primary" id="btn-preview" onclick="runShadowPreview()">
+              <span>1. Simulate Impact (Safe Dry-Run)</span>
+              <span class="btn-subtext" id="preview-latency-badge">Runs in &lt;3ms</span>
+            </button>
+
+            <button class="action-btn action-btn-secondary" id="btn-heal" onclick="runSelfHealPatch()" disabled>
+              <span>2. Auto-Fix Mistake</span>
+              <span class="btn-subtext" id="heal-btn-sub">Activates if danger found</span>
+            </button>
+          </div>
+
+          <!-- 1-Line Self-Heal Explanation Badge -->
+          <div class="heal-notice-badge" id="heal-badge" style="display: none;">
+            <div class="heal-notice-content">
+              <strong>✓ FIXED AUTOMATICALLY:</strong>
+              <span id="heal-badge-text">Protected active accounts from accidental deletion.</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- STEP 3: Final Decision -->
+        <section class="step-card">
+          <div class="step-badge-row">
+            <span class="step-number">STEP 3</span>
+            <span class="step-title">Final Decision</span>
+          </div>
+
+          <button class="action-btn action-btn-commit" id="btn-commit" onclick="commitTwoPhaseLock()" disabled>
+            <span id="commit-btn-label">3. Approve & Run for Real</span>
+            <span class="btn-subtext" id="commit-btn-sub">Locked until action is proven safe</span>
+          </button>
+
+          <!-- Commitment Confirmation Banner -->
+          <div class="commit-feedback-banner" id="commit-banner" style="display: none;">
+            <div class="banner-title" id="commit-banner-title">ACTION COMMITTED TO REAL DATABASE</div>
+            <div class="banner-desc" id="commit-banner-desc">Changes permanently applied and verified with cryptographic proof.</div>
+          </div>
+        </section>
+      </aside>
+
+      <!-- RIGHT STAGE (64% Width) — 3D Visualizer & Plain Impact Summary -->
+      <section class="right-stage">
+        <!-- 4-STEP ARCHITECTURAL PIPELINE BAR (44px Height) -->
+        <div class="pipeline-bar" id="pipeline-bar">
+          <div class="pipeline-stages">
+            <div class="pipeline-step active" id="pipe-step-1">
+              <span class="pipe-num">1.</span>
+              <span class="pipe-name">AGENT TOOL CALL</span>
+            </div>
+            <span class="pipe-arrow">➔</span>
+            <div class="pipeline-step" id="pipe-step-2">
+              <span class="pipe-num">2.</span>
+              <span class="pipe-name">SANDBOX DRY-RUN (PREVIEW)</span>
+            </div>
+            <span class="pipe-arrow">➔</span>
+            <div class="pipeline-step" id="pipe-step-3">
+              <span class="pipe-num">3.</span>
+              <span class="pipe-name">AUTO-FIX PATCH</span>
+            </div>
+            <span class="pipe-arrow">➔</span>
+            <div class="pipeline-step" id="pipe-step-4">
+              <span class="pipe-num">4.</span>
+              <span class="pipe-name">PRODUCTION COMMIT</span>
+            </div>
+          </div>
+          <div class="pipeline-status-badge" id="pipeline-status-badge">
+            READY TO DRY-RUN
+          </div>
+        </div>
+
+        <!-- TOP HERO (70% Height) — Interactive 3D Canvas -->
+        <div class="hero-canvas-container">
+          <!-- Canvas Top Controls -->
+          <div class="canvas-top-bar">
+            <div class="camera-pills">
+              <button class="cam-pill active" onclick="setCameraPerspective('ISOMETRIC', this)">Isometric View</button>
+              <button class="cam-pill" onclick="setCameraPerspective('TOPDOWN', this)">Top-Down View</button>
+              <button class="cam-pill" onclick="setCameraPerspective('CLOSEUP', this)">Close-Up View</button>
+            </div>
+
+            <div class="risk-meter-hud">
+              <span class="risk-meter-label">RISK SCORE:</span>
+              <span class="risk-meter-number" id="gauge-score-value">0.0</span>
+              <span class="risk-meter-scale">/ 100</span>
+            </div>
+          </div>
+
+          <!-- The Three.js WebGL Viewport -->
+          <div id="three-canvas-container" class="three-viewport"></div>
+
+          <!-- Floating Helper Pill -->
+          <div class="canvas-helper-pill">
+            Drag to rotate 3D view • Click any node to inspect
+          </div>
+
+          <!-- Floating Inspection Popover -->
+          <div id="node-hud-popover" class="node-hud-popover" style="display: none;"></div>
+        </div>
+
+        <!-- BOTTOM BAR (30% Height) — 3 Simple Impact Cards -->
+        <div class="bottom-impact-bar">
+          <div class="impact-cards-row">
+            <!-- Card 1: Safety Verdict -->
+            <div class="impact-card clickable-card" id="card-verdict" onclick="onImpactCardClick('verdict')" title="Click to inspect safety verdict in 3D & Diff">
+              <div class="card-caption">SAFETY VERDICT</div>
+              <div class="card-hero-text status-safe" id="card-verdict-title">READY TO SIMULATE</div>
+              <div class="card-desc" id="card-verdict-desc">Choose an action on the left and click "Simulate Impact".</div>
+            </div>
+
+            <!-- Card 2: People / Records Affected -->
+            <div class="impact-card clickable-card" id="card-records" onclick="onImpactCardClick('records')" title="Click to inspect changed customer rows in 3D & Diff">
+              <div class="card-caption">RECORDS AFFECTED</div>
+              <div class="card-hero-text" id="card-records-number">0 Records</div>
+              <div class="card-desc" id="card-records-desc">Customer accounts or database rows changed</div>
+            </div>
+
+            <!-- Card 3: Money at Risk -->
+            <div class="impact-card clickable-card" id="card-money" onclick="onImpactCardClick('money')" title="Click to inspect ledger balances in 3D & Diff">
+              <div class="card-caption">MONEY AT RISK</div>
+              <div class="card-hero-text" id="card-money-number">$0.00 Lost</div>
+              <div class="card-desc" id="card-money-desc">Potential financial balance or revenue impact</div>
+            </div>
+          </div>
+
+          <!-- Bottom Proof Modal Link -->
+          <div class="bottom-proof-strip">
+            <button class="details-link-btn" onclick="openDiffModal()">
+              [ Inspect Before vs. After Details → ]
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- MODAL: VIEW LIVE DATABASE -->
+    <div class="modal-overlay" id="modal-database" style="display: none;" onclick="if(event.target===this) closeDatabaseModal()">
+      <div class="modal-window modal-wide">
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title">LIVE PRODUCTION DATABASE</h2>
+            <p class="modal-subtitle">Real in-memory SQLite database catalog currently serving production.</p>
+          </div>
+          <button class="modal-close-btn" onclick="closeDatabaseModal()">[ ✕ Close ]</button>
+        </div>
+
+        <div class="modal-tabs">
+          <button class="modal-tab-btn active" id="dbtab-acc" onclick="switchDbTable('enterprise_accounts', this)">enterprise_accounts (16)</button>
+          <button class="modal-tab-btn" id="dbtab-led" onclick="switchDbTable('payment_ledger', this)">payment_ledger (24)</button>
+          <button class="modal-tab-btn" id="dbtab-cfg" onclick="switchDbTable('service_configs', this)">service_configs (10)</button>
+          <button class="modal-tab-btn" id="dbtab-eml" onclick="switchDbTable('outbound_mail_queue', this)">outbound_mail_queue (12)</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="table-wrap">
+            <table class="clean-table" id="db-inspect-table">
+              <!-- Populated dynamically via app.js -->
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: COMPARE BEFORE & AFTER DETAILS + CRYPTO PROOF -->
+    <div class="modal-overlay" id="modal-diff" style="display: none;" onclick="if(event.target===this) closeDiffModal()">
+      <div class="modal-window modal-wide">
+        <div class="modal-header">
+          <div>
+            <h2 class="modal-title">EXACT BEFORE & AFTER AUDIT</h2>
+            <p class="modal-subtitle">Side-by-side comparison of production state vs shadow simulation outcome.</p>
+          </div>
+          <button class="modal-close-btn" onclick="closeDiffModal()">[ ✕ Close ]</button>
+        </div>
+
+        <div class="modal-tabs">
+          <button class="modal-tab-btn active" id="difftab-acc" onclick="switchDiffTable('enterprise_accounts', this)">enterprise_accounts</button>
+          <button class="modal-tab-btn" id="difftab-led" onclick="switchDiffTable('payment_ledger', this)">payment_ledger</button>
+          <button class="modal-tab-btn" id="difftab-cfg" onclick="switchDiffTable('service_configs', this)">service_configs</button>
+          <button class="modal-tab-btn" id="difftab-eml" onclick="switchDiffTable('outbound_mail_queue', this)">outbound_mail_queue</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Tactile Diff View Mode & Filter Toggles -->
+          <div class="diff-controls-bar">
+            <div class="diff-toggle-group">
+              <button class="diff-toggle-btn active" id="diff-view-both" onclick="setDiffViewMode('both')">[ View Side-by-Side ]</button>
+              <button class="diff-toggle-btn" id="diff-view-before" onclick="setDiffViewMode('before')">[ View Before Only ]</button>
+              <button class="diff-toggle-btn" id="diff-view-after" onclick="setDiffViewMode('after')">[ View After Only ]</button>
+            </div>
+            <label class="diff-filter-label">
+              <input type="checkbox" id="diff-changed-only-check" onchange="toggleDiffChangedOnly(this.checked)">
+              <span>Show Only Changed Rows</span>
+            </label>
+          </div>
+
+          <div class="diff-split-grid" id="diff-split-grid">
+            <div class="diff-col" id="diff-col-before">
+              <div class="diff-title">LIVE PRODUCTION (BEFORE)</div>
+              <div class="table-wrap">
+                <table class="clean-table" id="table-before"></table>
+              </div>
+            </div>
+            <div class="diff-col" id="diff-col-after">
+              <div class="diff-title">SIMULATED OUTCOME (AFTER)</div>
+              <div class="table-wrap">
+                <table class="clean-table" id="table-after"></table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Collapsible Technical Proof Drawer -->
+          <div class="collapsible-crypto-drawer">
+            <button class="crypto-toggle-btn" onclick="toggleCryptoProof()">
+              <span id="crypto-toggle-icon">+</span>
+              <span>View Technical 2PC Cryptographic Proof &amp; Hashes</span>
+            </button>
+            <div class="crypto-details-box" id="crypto-details-box" style="display: none;">
+              <div class="crypto-item">
+                <span class="crypto-label">PRE-STATE SHA-256 HASH:</span>
+                <span class="crypto-val" id="receipt-pre-hash">—</span>
+              </div>
+              <div class="crypto-item">
+                <span class="crypto-label">POST-STATE SHA-256 HASH:</span>
+                <span class="crypto-val" id="receipt-post-hash">—</span>
+              </div>
+              <div class="crypto-item">
+                <span class="crypto-label">PAYLOAD SHA-256 CHECKSUM:</span>
+                <span class="crypto-val" id="receipt-payload-hash">—</span>
+              </div>
+              <div class="crypto-item">
+                <span class="crypto-label">HMAC-SHA256 SIGNATURE:</span>
+                <span class="crypto-val" id="receipt-hmac-sig">—</span>
+              </div>
+              <div class="crypto-item">
+                <span class="crypto-label">2PC PREVIEW LOCK TTL:</span>
+                <span class="crypto-val" id="receipt-ttl-text">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE-OVER DRAWER: 24-TEST ACCURACY BENCHMARK & VISUAL SCORECARD -->
+    <div class="drawer-overlay" id="drawer-benchmarks" style="display: none;">
+      <div class="drawer-backdrop" onclick="closeBenchmarkDrawer()"></div>
+      <div class="drawer-panel scorecard-drawer">
+        <div class="drawer-header">
+          <div>
+            <h2 class="modal-title">24-TEST ACCURACY BENCHMARK &amp; EVALUATION SCORECARD</h2>
+            <p class="modal-subtitle">Real-time evaluation across 18 destructive hazards and 6 completely safe actions.</p>
+          </div>
+          <button class="modal-close-btn" onclick="closeBenchmarkDrawer()">[ ✕ Close Drawer ]</button>
+        </div>
+
+        <!-- TOP 4 BIG HEADLINE METRICS (Easy to Read in 3 Seconds) -->
+        <div class="scorecard-metrics-grid">
+          <div class="scorecard-metric-card">
+            <div class="metric-caption">BAD ACTIONS CAUGHT (RECALL)</div>
+            <div class="metric-hero status-danger-text" id="scorecard-bad-caught">18 / 18</div>
+            <div class="metric-sub" id="scorecard-bad-sub">100% Interception Rate</div>
+          </div>
+          <div class="scorecard-metric-card">
+            <div class="metric-caption">SAFE ACTIONS ALLOWED</div>
+            <div class="metric-hero status-safe-text" id="scorecard-safe-allowed">6 / 6</div>
+            <div class="metric-sub" id="scorecard-safe-sub">Zero False Alarms</div>
+          </div>
+          <div class="scorecard-metric-card">
+            <div class="metric-caption">AUTO-FIX SUCCESS RATE</div>
+            <div class="metric-hero" id="scorecard-heal-rate">100%</div>
+            <div class="metric-sub">Repaired Safely Without Loss</div>
+          </div>
+          <div class="scorecard-metric-card">
+            <div class="metric-caption">AVERAGE SANDBOX SPEED</div>
+            <div class="metric-hero" id="scorecard-speed">&lt; 8 ms</div>
+            <div class="metric-sub" id="scorecard-speed-sub">Per Isolated Simulation</div>
+          </div>
+        </div>
+
+        <!-- CLEAN VISUAL BREAKDOWN BY DOMAIN (3 Horizontal Progress Bars) -->
+        <div class="domain-bars-section">
+          <div class="domain-bar-row">
+            <div class="domain-bar-header">
+              <span class="domain-bar-title">Code &amp; Database Deployments</span>
+              <span class="domain-bar-stat" id="dom-stat-sql">6/6 Hazards Caught • 2/2 Safe Allowed</span>
+            </div>
+            <div class="domain-progress-track">
+              <div class="domain-progress-fill" id="dom-fill-sql" style="width: 100%;"></div>
+            </div>
+          </div>
+
+          <div class="domain-bar-row">
+            <div class="domain-bar-header">
+              <span class="domain-bar-title">Payment &amp; Refund Actions</span>
+              <span class="domain-bar-stat" id="dom-stat-pay">6/6 Hazards Caught • 2/2 Safe Allowed</span>
+            </div>
+            <div class="domain-progress-track">
+              <div class="domain-progress-fill" id="dom-fill-pay" style="width: 100%;"></div>
+            </div>
+          </div>
+
+          <div class="domain-bar-row">
+            <div class="domain-bar-header">
+              <span class="domain-bar-title">Outbound Email &amp; Privacy Risks</span>
+              <span class="domain-bar-stat" id="dom-stat-eml">6/6 Hazards Caught • 2/2 Safe Allowed</span>
+            </div>
+            <div class="domain-progress-track">
+              <div class="domain-progress-fill" id="dom-fill-eml" style="width: 100%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scorecard Filter Toolbar & Actions -->
+        <div class="scorecard-toolbar">
+          <div class="modal-tabs">
+            <button class="modal-tab-btn active" onclick="filterBenchmarks('ALL', this)">All 24 Tests</button>
+            <button class="modal-tab-btn" onclick="filterBenchmarks('CODE & SQL DEPLOY', this)">Database (8)</button>
+            <button class="modal-tab-btn" onclick="filterBenchmarks('PAYMENT LEDGER', this)">Payments (8)</button>
+            <button class="modal-tab-btn" onclick="filterBenchmarks('OUTBOUND EMAIL', this)">Emails (8)</button>
+          </div>
+          <div class="scorecard-actions-right">
+            <button class="action-btn action-btn-primary" style="padding: 6px 14px; font-size: 11px;" onclick="runAllBenchmarks()">
+              <span>[ Re-Run All 24 Accuracy Tests ]</span>
+            </button>
+            <button class="action-btn action-btn-secondary" style="padding: 6px 12px; font-size: 11px;" onclick="runRedTeamSuite()">
+              <span>[ 5 Red-Team Attacks ]</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Benchmarks Table (Interactive "Test Any Case" Row Click) -->
+        <div class="drawer-table-wrap">
+          <table class="clean-table" id="benchmark-table">
+            <thead>
+              <tr>
+                <th>TEST NAME (PLAIN ENGLISH)</th>
+                <th style="width: 110px;">DOMAIN</th>
+                <th style="width: 90px;">EXPECTED</th>
+                <th style="width: 120px;">SANDBOX VERDICT</th>
+                <th style="width: 190px; text-align: center;">ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="benchmark-tbody">
+              <!-- Populated via app.js -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Red Team Attack Section -->
+        <div class="redteam-section">
+          <h3 style="font-size: 14px; text-transform: uppercase; margin-bottom: 8px;">Offensive Red-Team Barrier Tests</h3>
+          <div class="redteam-cards-grid" id="redteam-cards-container">
+            <!-- Populated via app.js -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="/static/blast_canvas_3d.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

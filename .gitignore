@@ -1,0 +1,26 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+env/
+venv/
+.venv/
+ENV/
+
+# System and IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Antigravity & IDE generated temporary artifacts
+.system_generated/
+.tempmediaStorage/
+*.log
+
+# Scratch scripts
+scratch/
