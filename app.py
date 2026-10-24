@@ -1310,10 +1310,19 @@ def compile_natural_language_intent(prompt: str) -> Dict[str, Any]:
     p = prompt.strip()
     p_lower = p.lower()
 
-    # 1. Direct raw SQL detection
-    sql_starters = ["select", "insert", "update", "delete", "drop", "alter", "create", "pragma", "begin"]
-    first_token = p_lower.split()[0].rstrip(";")
-    if first_token in sql_starters:
+    # 1. Direct raw SQL detection (only when structured as valid SQL grammar)
+    is_direct_sql = (
+        (p_lower.startswith("select ") and " from " in p_lower) or
+        p_lower.startswith("delete from ") or
+        (p_lower.startswith("update ") and " set " in p_lower) or
+        p_lower.startswith("insert into ") or
+        p_lower.startswith("drop table ") or
+        p_lower.startswith("drop view ") or
+        p_lower.startswith("alter table ") or
+        p_lower.startswith("create table ") or
+        p_lower.startswith("pragma ")
+    )
+    if is_direct_sql:
         sql_statement = p if p.endswith(";") else p + ";"
         return {
             "success": True,
@@ -1364,17 +1373,17 @@ def compile_natural_language_intent(prompt: str) -> Dict[str, Any]:
         except Exception:
             pass
 
-    # 3. Action Verb & Entity Extraction
+    # 3. Action Verb & Entity Extraction with word boundaries
     sql_verbs = ["delete", "drop", "purge", "clean", "remove", "wipe", "update", "set", "change", "tune", "scale", "alter", "create", "insert"]
     pay_verbs = ["refund", "charge", "pay", "payout", "disburse", "wire", "release", "bill", "invoice", "settle", "drain"]
     email_verbs = ["email", "mail", "send", "notify", "broadcast", "alert", "dispatch", "message"]
 
-    has_sql_verb = any(v in p_lower for v in sql_verbs)
-    has_pay_verb = any(v in p_lower for v in pay_verbs)
-    has_email_verb = any(v in p_lower for v in email_verbs)
+    has_sql_verb = any(re.search(r"\b" + re.escape(v) + r"\b", p_lower) for v in sql_verbs)
+    has_pay_verb = any(re.search(r"\b" + re.escape(v) + r"\b", p_lower) for v in pay_verbs)
+    has_email_verb = any(re.search(r"\b" + re.escape(v) + r"\b", p_lower) for v in email_verbs)
 
     has_sql_noun = any(n in p_lower for n in ["account", "user", "table", "database", "schema", "config", "setting", "burst", "ddos", "pool", "mtls", "auth", "enterprise"])
-    has_pay_noun = any(n in p_lower for n in ["payment", "ledger", "money", "dollar", "usd", "fund", "balance", "escrow", "order", "charge", "transaction"])
+    has_pay_noun = any(n in p_lower for n in ["payment", "ledger", "money", "dollar", "usd", "fund", "balance", "escrow", "order", "transaction"])
     has_email_noun = any(n in p_lower for n in ["email", "mail", "recipient", "cto", "ciso", "credential", "secret", "aws", "announcement", "notice", "inbox"])
 
     # Diagnostic check for gibberish or unparseable commands
@@ -1385,9 +1394,11 @@ def compile_natural_language_intent(prompt: str) -> Dict[str, Any]:
             "prompt": prompt
         }
 
-    # Resolve domain
+    # Resolve domain: explicit table/database mentions strongly route to CODE & SQL DEPLOY
     domain = "CODE & SQL DEPLOY"
-    if has_email_verb and (has_email_noun or not (has_sql_noun or has_pay_noun)):
+    if any(w in p_lower for w in ["table", "database", "schema"]) and has_sql_verb:
+        domain = "CODE & SQL DEPLOY"
+    elif has_email_verb and (has_email_noun or not (has_sql_noun or has_pay_noun)):
         domain = "OUTBOUND EMAIL"
     elif has_pay_verb and (has_pay_noun or not (has_sql_noun or has_email_noun)):
         domain = "PAYMENT LEDGER"
@@ -1455,9 +1466,15 @@ def compile_natural_language_intent(prompt: str) -> Dict[str, Any]:
         ]
 
     elif domain == "PAYMENT LEDGER":
-        # Dynamic extraction of amount
-        amt_match = re.search(r"[-+]?\$?([0-9]+(?:\.[0-9]+)?)", p)
-        amount = float(amt_match.group(1)) if amt_match else 5000.0
+        # Dynamic extraction of amount (supporting comma notation e.g. $15,000.00)
+        amt_match = re.search(r"[-+]?\$?([0-9]{1,3}(?:,[0-9]{3})+(?:\.[0-9]+)?|[0-9]+(?:\.[0-9]+)?)", p)
+        if amt_match:
+            try:
+                amount = float(amt_match.group(1).replace(",", ""))
+            except Exception:
+                amount = 5000.0
+        else:
+            amount = 5000.0
         if "negative" in p_lower or "-$" in p or "- " in p:
             amount = -abs(amount)
 
