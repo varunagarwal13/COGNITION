@@ -104,9 +104,9 @@
           role: 'Customer Directory',
           type: 'DATABASE',
           x: -18, y: 8, z: -16,
-          desc: '16 paying enterprise accounts and contracts.',
-          dangerMsg: '⚠️ 16 customer accounts will be wiped out!',
-          safeMsg: '✓ Safe: 0 customer accounts harmed.'
+          desc: 'Live enterprise account directory and active contracts.',
+          dangerMsg: '⚠️ Customer accounts in blast radius!',
+          safeMsg: '✓ Safe: Customer directory verified intact.'
         },
         {
           id: 'payment_ledger',
@@ -115,7 +115,7 @@
           type: 'DATABASE',
           x: 6, y: -4, z: 2,
           desc: 'Settled transaction balances & escrow records.',
-          dangerMsg: '⚠️ Payments & settlement balances will be lost!',
+          dangerMsg: '⚠️ Payments & settlement balances in blast radius!',
           safeMsg: '✓ Safe: $0 financial loss detected.'
         },
         {
@@ -126,7 +126,7 @@
           x: -10, y: 20, z: 16,
           desc: 'Access gates, encryption keys, and rate limits.',
           dangerMsg: '⚠️ Core authentication rules altered!',
-          safeMsg: '✓ Safe: All 10 security settings intact.'
+          safeMsg: '✓ Safe: Security policy settings intact.'
         },
         {
           id: 'outbound_mail_queue',
@@ -135,7 +135,7 @@
           type: 'DATABASE',
           x: 26, y: 10, z: -16,
           desc: 'Queued customer announcements and receipts.',
-          dangerMsg: '⚠️ Secret API key leaked in email body!',
+          dangerMsg: '⚠️ Credentials or private data in email body!',
           safeMsg: '✓ Safe: Zero credentials or private data leaked.'
         },
         {
@@ -144,7 +144,7 @@
           role: 'Authentication',
           type: 'GATEWAY',
           x: -56, y: 4, z: -10,
-          desc: 'Shield preventing unauthorized intrusion.',
+          desc: 'Zero-trust mTLS gateway protecting customer logins.',
           dangerMsg: '⚠️ Authentication bypassed or compromised!',
           safeMsg: '✓ Safe: Guard shield actively protecting login.'
         },
@@ -154,7 +154,7 @@
           role: 'Ingress Proxy',
           type: 'GATEWAY',
           x: -42, y: 16, z: 12,
-          desc: 'Routes inbound API calls into internal servers.',
+          desc: 'Inbound router enforcing API rate limits and quotas.',
           dangerMsg: '⚠️ Inbound traffic limits flooded or altered!',
           safeMsg: '✓ Safe: Inbound routing operating normally.'
         },
@@ -164,7 +164,7 @@
           role: 'Treasury Clearing',
           type: 'SERVICE',
           x: 40, y: -12, z: 14,
-          desc: 'Processes bank transfers and credit cards.',
+          desc: 'Dual-custody clearing rail for financial transactions.',
           dangerMsg: '⚠️ Unauthorized refund drain detected!',
           safeMsg: '✓ Safe: Treasury rail balances verified.'
         },
@@ -174,7 +174,7 @@
           role: 'Mail Server',
           type: 'SERVICE',
           x: 54, y: 14, z: -22,
-          desc: 'Delivers notifications to customer inboxes.',
+          desc: 'Outbound SMTP relay filtering communications for PII.',
           dangerMsg: '⚠️ Mass unauthorized broadcast in progress!',
           safeMsg: '✓ Safe: Outbound mail dispatch certified safe.'
         }
@@ -539,6 +539,18 @@
       }
       if (this.nodeMeshes['outbound_mail_queue']) {
         this.nodeMeshes['outbound_mail_queue'].data.desc = `${cat.outbound_mail_queue_count} queued outbound client communications.`;
+      }
+      if (this.nodeMeshes['AUTH_GATEWAY']) {
+        this.nodeMeshes['AUTH_GATEWAY'].data.desc = `Strict zero-trust mTLS gateway protecting ${cat.enterprise_accounts_count} enterprise directories.`;
+      }
+      if (this.nodeMeshes['API_GATEWAY_V1']) {
+        this.nodeMeshes['API_GATEWAY_V1'].data.desc = `Ingress router enforcing burst allowances across ${cat.service_configs_count} runtime configurations.`;
+      }
+      if (this.nodeMeshes['STRIPE_CONNECTOR']) {
+        this.nodeMeshes['STRIPE_CONNECTOR'].data.desc = `Dual-custody clearing rail for $${(cat.total_ledger_usd || 0).toLocaleString()} transaction volume.`;
+      }
+      if (this.nodeMeshes['SES_SMTP_RELAY']) {
+        this.nodeMeshes['SES_SMTP_RELAY'].data.desc = `Outbound dispatch relay filtering ${cat.outbound_mail_queue_count} queued communications for PII.`;
       }
     }
 

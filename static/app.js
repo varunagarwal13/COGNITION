@@ -30,17 +30,17 @@
     'CODE & SQL DEPLOY': [
       {
         title: 'Clean up inactive trial accounts',
-        subtitle: 'Hidden danger: accidentally deletes 6 paying business clients',
+        subtitle: 'Purge suspended accounts from enterprise directory',
         payload: "DELETE FROM enterprise_accounts WHERE status = 'SUSPENDED';"
       },
       {
         title: 'Upgrade server speed setting',
-        subtitle: 'Safe: increases network burst allowance to 2048',
+        subtitle: 'Tune runtime network burst allowance to 2048',
         payload: "UPDATE service_configs SET current_value = '2048' WHERE env_key = 'DDOS_BURST_ALLOWANCE';"
       },
       {
         title: 'Remove expired database records',
-        subtitle: 'Hidden danger: accidentally drops the entire payment table',
+        subtitle: 'Decommission historical payment transactions table',
         payload: "DROP TABLE payment_ledger;"
       }
     ],
@@ -48,7 +48,7 @@
     'PAYMENT LEDGER': [
       {
         title: 'Refund stuck customer orders',
-        subtitle: 'Hidden danger: refunds the same order multiple times',
+        subtitle: 'Batch process multi-iteration order refunds',
         payload: JSON.stringify({
           action: "BATCH_REFUND",
           account_id: "ACC-CORP-01",
@@ -58,7 +58,7 @@
       },
       {
         title: 'Standard escrow release',
-        subtitle: 'Safe: releases scheduled $15,000 contractor milestone',
+        subtitle: 'Disburse scheduled contractor milestone from escrow',
         payload: JSON.stringify({
           action: "ESCROW_RELEASE",
           account_id: "ACC-CORP-02",
@@ -67,7 +67,7 @@
       },
       {
         title: 'Emergency account payout',
-        subtitle: 'Hidden danger: attempts payout with negative balance trick',
+        subtitle: 'Process rapid balance adjustment payout',
         payload: JSON.stringify({
           action: "REFUND",
           account_id: "ACC-CORP-03",
@@ -79,7 +79,7 @@
     'OUTBOUND EMAIL': [
       {
         title: 'Email customers about server maintenance',
-        subtitle: 'Hidden danger: accidentally leaks an internal secret key',
+        subtitle: 'Send maintenance instructions with storage authorization',
         payload: JSON.stringify({
           recipient: "external-partner@analytics-untrusted.com",
           subject: "S3 Sync Credentials",
@@ -88,7 +88,7 @@
       },
       {
         title: 'Quarterly compliance receipt',
-        subtitle: 'Safe: sends routine uptime audit confirmation',
+        subtitle: 'Dispatch SLA uptime compliance attestation',
         payload: JSON.stringify({
           recipient: "cto@apexaero.mil",
           subject: "Quarterly SLA Compliance Verification",
@@ -97,7 +97,7 @@
       },
       {
         title: 'Broadcast urgent notice',
-        subtitle: 'Hidden danger: mass panics all enterprise CTOs',
+        subtitle: 'Send priority service announcement to executive contacts',
         payload: JSON.stringify({
           recipient: "ALL_ENTERPRISE_CTOS",
           subject: "URGENT: Catastrophic Core Database Loss",
@@ -122,12 +122,11 @@
     // 3. Render Step 1 Scenario Cards
     renderScenarioCards();
 
-    // 4. Setup Textarea Auto-byte Counter
+    // 4. Setup Textarea Auto-byte Counter & TOCTOU Preserver
     const editor = document.getElementById('payload-editor');
     if (editor) {
       editor.addEventListener('input', () => {
-        updateByteCounter();
-        invalidatePreviewState();
+        handleEditorInput();
       });
     }
 
@@ -329,19 +328,73 @@
     }
   }
 
+  function handleEditorInput() {
+    updateByteCounter();
+    if (AppState.activeToken) {
+      // User is editing after preview was already simulated - TOCTOU scenario!
+      AppState.isTampered = true;
+      const wbStatus = document.getElementById('wb-token-status');
+      if (wbStatus) {
+        wbStatus.innerText = '⚠️ TAMPERED (TOCTOU RISK)';
+        wbStatus.className = 'crypto-strip-val status-pill status-tampered';
+      }
+      const btnCommit = document.getElementById('btn-commit');
+      const commitLabel = document.getElementById('commit-btn-label');
+      const commitSub = document.getElementById('commit-btn-sub');
+      if (btnCommit) btnCommit.disabled = false;
+      if (commitLabel) commitLabel.innerText = '3. Attempt Commit (Test 2PC Gate)';
+      if (commitSub) commitSub.innerText = 'Demonstrate HTTP 409 rejection';
+      
+      const btnTamper = document.getElementById('btn-tamper');
+      if (btnTamper) btnTamper.style.display = 'block';
+    } else {
+      invalidatePreviewState();
+    }
+  }
+
+  window.simulateTamperPayload = function () {
+    const editor = document.getElementById('payload-editor');
+    if (!editor) return;
+    if (AppState.currentDomain === 'CODE & SQL DEPLOY') {
+      editor.value = editor.value.trimEnd() + ' -- TOCTOU_TAMPER_MODIFICATION\n';
+    } else {
+      editor.value = editor.value + ' ';
+    }
+    handleEditorInput();
+  };
+
   function invalidatePreviewState() {
     AppState.activeToken = null;
     AppState.tokenReceipt = null;
+    AppState.isTampered = false;
     const btnCommit = document.getElementById('btn-commit');
+    const commitLabel = document.getElementById('commit-btn-label');
     const commitSub = document.getElementById('commit-btn-sub');
     if (btnCommit) btnCommit.disabled = true;
+    if (commitLabel) commitLabel.innerText = '3. Approve & Run for Real';
     if (commitSub) commitSub.innerText = 'Locked until action is proven safe';
+
+    const btnTamper = document.getElementById('btn-tamper');
+    if (btnTamper) btnTamper.style.display = 'none';
 
     const healBadge = document.getElementById('heal-badge');
     if (healBadge) healBadge.style.display = 'none';
 
     const commitBanner = document.getElementById('commit-banner');
     if (commitBanner) commitBanner.style.display = 'none';
+
+    // Synchronize workbench strip
+    const wbPre = document.getElementById('wb-pre-state-hash');
+    const wbPay = document.getElementById('wb-payload-hash');
+    const wbStatus = document.getElementById('wb-token-status');
+    const wbTtl = document.getElementById('wb-ttl-countdown');
+    if (wbPre) wbPre.innerText = '—';
+    if (wbPay) wbPay.innerText = '—';
+    if (wbStatus) {
+      wbStatus.innerText = 'UNSIGNED (NO LOCK)';
+      wbStatus.className = 'crypto-strip-val status-pill';
+    }
+    if (wbTtl) wbTtl.innerText = '—';
   }
 
   function resetImpactSummaryUI() {
@@ -402,16 +455,22 @@
       });
 
       const elapsed = Math.round(performance.now() - startTime);
-      if (latencyBadge) latencyBadge.innerText = `Simulated in ${elapsed}ms`;
-
       const data = await res.json();
       AppState.lastPreview = data;
+
+      if (latencyBadge) {
+        latencyBadge.innerText = (data.latency_ms !== undefined) ? `CoW Sim: ${data.latency_ms.toFixed(2)}ms` : `Simulated in ${elapsed}ms`;
+      }
 
       // Extract 2PC Token
       if (data.token_envelope) {
         AppState.activeToken = data.token_envelope.token;
         AppState.tokenReceipt = data.token_envelope.receipt;
+        AppState.isTampered = false;
         startTtlCountdown(data.token_envelope.receipt.expires_at);
+
+        const btnTamper = document.getElementById('btn-tamper');
+        if (btnTamper) btnTamper.style.display = 'block';
       }
 
       // Store diff data for detail modal
@@ -643,8 +702,15 @@
       const bDesc = document.getElementById('commit-banner-desc');
       if (banner) {
         banner.style.display = 'block';
+        banner.className = 'commit-feedback-banner';
         if (bTitle) bTitle.innerText = '✓ ACTION COMMITTED TO REAL DATABASE';
         if (bDesc) bDesc.innerText = `Verified in real-time. New production state hash: ${commitData.new_production_state_hash.substring(0, 16)}...`;
+      }
+
+      const wbStatus = document.getElementById('wb-token-status');
+      if (wbStatus) {
+        wbStatus.innerText = '✓ COMMITTED & CONSUMED';
+        wbStatus.className = 'crypto-strip-val status-pill status-signed';
       }
 
       // Refresh live database state
@@ -656,9 +722,23 @@
       if (commitSub) commitSub.innerText = 'Successfully applied!';
 
     } catch (err) {
-      alert(`Commit Blocked: ${err.message}`);
       if (btnCommit) btnCommit.disabled = false;
       if (commitSub) commitSub.innerText = 'Commit rejected';
+
+      const banner = document.getElementById('commit-banner');
+      const bTitle = document.getElementById('commit-banner-title');
+      const bDesc = document.getElementById('commit-banner-desc');
+      if (banner) {
+        banner.style.display = 'block';
+        banner.className = 'commit-feedback-banner is-rejected';
+        if (bTitle) bTitle.innerText = '✗ 2PC COMMIT BLOCKED: CRYPTOGRAPHIC CONFLICT';
+        if (bDesc) bDesc.innerText = err.message;
+      }
+      const wbStatus = document.getElementById('wb-token-status');
+      if (wbStatus) {
+        wbStatus.innerText = '✗ BLOCKED (TOCTOU / DRIFT)';
+        wbStatus.className = 'crypto-strip-val status-pill status-tampered';
+      }
     }
   };
 
@@ -870,15 +950,44 @@
     if (postEl) postEl.innerText = data.simulated_post_state_hash || '—';
     if (payEl) payEl.innerText = data.payload_sha256 || '—';
     if (hmacEl && data.token_envelope) hmacEl.innerText = data.token_envelope.signature || '—';
+
+    // Sync always-visible workbench 2PC cryptographic strip
+    const wbPre = document.getElementById('wb-pre-state-hash');
+    const wbPay = document.getElementById('wb-payload-hash');
+    const wbStatus = document.getElementById('wb-token-status');
+
+    if (wbPre) {
+      const fullPre = data.pre_state_hash || '—';
+      const shortPre = fullPre.length > 16 ? fullPre.substring(0, 16) + '...' : fullPre;
+      wbPre.innerText = shortPre;
+      wbPre.title = `Full Pre-State SHA-256: ${fullPre}`;
+    }
+    if (wbPay) {
+      const fullPay = data.payload_sha256 || '—';
+      const shortPay = fullPay.length > 16 ? fullPay.substring(0, 16) + '...' : fullPay;
+      wbPay.innerText = shortPay;
+      wbPay.title = `Full Payload SHA-256: ${fullPay}`;
+    }
+    if (wbStatus) {
+      if (data.token_envelope) {
+        wbStatus.innerText = 'SIGNED & LOCKED (2PC)';
+        wbStatus.className = 'crypto-strip-val status-pill status-signed';
+      } else {
+        wbStatus.innerText = 'UNSIGNED (NO LOCK)';
+        wbStatus.className = 'crypto-strip-val status-pill';
+      }
+    }
   }
 
   function startTtlCountdown(expiresAt) {
     if (AppState.ttlTimer) clearInterval(AppState.ttlTimer);
     const ttlEl = document.getElementById('receipt-ttl-text');
+    const wbTtl = document.getElementById('wb-ttl-countdown');
 
     AppState.ttlTimer = setInterval(() => {
       const remaining = Math.max(0, Math.floor(expiresAt - (Date.now() / 1000)));
       if (ttlEl) ttlEl.innerText = `${remaining}s remaining`;
+      if (wbTtl) wbTtl.innerText = `${remaining}s`;
       if (remaining <= 0) {
         clearInterval(AppState.ttlTimer);
         invalidatePreviewState();
@@ -1066,12 +1175,16 @@
             <span class="badge-blocked">${v.status}</span>
           </div>
         `).join('');
+        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-
-      alert(`[RED-TEAM ATTACK SUITE: 100% BLOCKED]\nAll 5 adversarial vectors (TOCTOU, Race Condition, Stacked SQL, Sign Inversion, XSS) were intercepted.`);
     } catch (e) {
-      alert(`Red Team test error: ${e.message}`);
+      console.error('Red Team test error:', e);
     }
+  };
+
+  window.openRedTeamModal = async function () {
+    window.openBenchmarkDrawer();
+    await window.runRedTeamSuite();
   };
 
   // --------------------------------------------------------------------------

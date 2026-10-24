@@ -28,6 +28,7 @@
       <div class="nav-right">
         <button class="nav-pill-btn" onclick="openDatabaseModal()">[ View Live Database ]</button>
         <button class="nav-pill-btn" onclick="openBenchmarkDrawer()">[ 24-Test Accuracy Scorecard ]</button>
+        <button class="nav-pill-btn nav-redteam-btn" id="btn-nav-redteam" onclick="openRedTeamModal()">[ 5-Vector Red-Team ]</button>
         <button class="nav-pill-btn nav-reset-btn" onclick="resetSystemState()">[ Reset Demo ]</button>
       </div>
     </header>
@@ -129,6 +130,11 @@
             <span class="btn-subtext" id="commit-btn-sub">Locked until action is proven safe</span>
           </button>
 
+          <button class="action-btn action-btn-tamper" id="btn-tamper" onclick="simulateTamperPayload()" style="display: none;">
+            <span>⚠️ Test TOCTOU Tamper</span>
+            <span class="btn-subtext">Mutates 1 char to test HTTP 409 gate</span>
+          </button>
+
           <!-- Commitment Confirmation Banner -->
           <div class="commit-feedback-banner" id="commit-banner" style="display: none;">
             <div class="banner-title" id="commit-banner-title">ACTION COMMITTED TO REAL DATABASE</div>
@@ -164,6 +170,26 @@
           </div>
           <div class="pipeline-status-badge" id="pipeline-status-badge">
             READY TO DRY-RUN
+          </div>
+        </div>
+
+        <!-- ALWAYS-VISIBLE 2PC CRYPTOGRAPHIC ATTESTATION STRIP -->
+        <div class="workbench-2pc-strip" id="workbench-2pc-strip">
+          <div class="crypto-strip-item">
+            <span class="crypto-strip-label">PRE-STATE:</span>
+            <span class="crypto-strip-val" id="wb-pre-state-hash" title="Live catalog pre-mutation state hash">—</span>
+          </div>
+          <div class="crypto-strip-item">
+            <span class="crypto-strip-label">PAYLOAD SHA-256:</span>
+            <span class="crypto-strip-val" id="wb-payload-hash" title="Cryptographic payload checksum">—</span>
+          </div>
+          <div class="crypto-strip-item">
+            <span class="crypto-strip-label">HMAC TOKEN:</span>
+            <span class="crypto-strip-val status-pill" id="wb-token-status">UNSIGNED (NO LOCK)</span>
+          </div>
+          <div class="crypto-strip-item">
+            <span class="crypto-strip-label">LOCK TTL:</span>
+            <span class="crypto-strip-val ttl-counter" id="wb-ttl-countdown">—</span>
           </div>
         </div>
 

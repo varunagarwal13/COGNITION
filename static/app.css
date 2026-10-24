@@ -1391,3 +1391,95 @@ html, body {
   margin-right: 3px;
 }
 
+/* 2PC Cryptographic Attestation Workbench Strip */
+.workbench-2pc-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 14px;
+  background-color: var(--bg-card-tertiary);
+  border: 1px solid var(--ink-editorial-dark);
+  border-bottom: 2px solid var(--ink-editorial-dark);
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 11px;
+}
+
+.crypto-strip-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.crypto-strip-label {
+  font-weight: bold;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--ink-editorial-muted);
+}
+
+.crypto-strip-val {
+  font-family: 'Times New Roman', Times, serif;
+  font-weight: bold;
+  color: var(--ink-editorial-dark);
+}
+
+.crypto-strip-val.status-pill {
+  padding: 2px 7px;
+  border: 1px solid var(--ink-editorial-dark);
+  background-color: var(--bg-surface-secondary);
+  font-size: 10px;
+  text-transform: uppercase;
+  box-shadow: 1px 1px 0px #2B1919;
+}
+
+.crypto-strip-val.status-pill.status-signed {
+  background-color: var(--brand-accent-coral);
+  color: var(--ink-editorial-dark);
+}
+
+.crypto-strip-val.status-pill.status-tampered {
+  background-color: var(--brand-accent-coral);
+  color: var(--ink-editorial-dark);
+  animation: pulse-border 1.5s infinite;
+}
+
+.crypto-strip-val.ttl-counter {
+  font-weight: bold;
+  color: var(--ink-editorial-dark);
+}
+
+/* Tamper Button */
+.action-btn-tamper {
+  margin-top: 8px;
+  background-color: var(--bg-card-tertiary) !important;
+  border: 1px dashed var(--ink-editorial-dark) !important;
+  color: var(--ink-editorial-dark) !important;
+  box-shadow: 2px 2px 0px #2B1919 !important;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.action-btn-tamper:hover {
+  background-color: var(--brand-accent-coral) !important;
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0px #2B1919 !important;
+}
+
+/* Rejected Commit Banner */
+.commit-feedback-banner.is-rejected {
+  border-color: var(--ink-editorial-dark) !important;
+  background-color: var(--brand-accent-coral) !important;
+  box-shadow: 3px 3px 0px #2B1919 !important;
+}
+
+.nav-redteam-btn {
+  background-color: var(--bg-card-tertiary);
+  border: 1px solid var(--ink-editorial-dark);
+}
+
+.nav-redteam-btn:hover {
+  background-color: var(--brand-accent-coral);
+}
+
+

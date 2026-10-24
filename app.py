@@ -486,26 +486,67 @@ def synthesize_safe_patch(domain: str, payload_str: str) -> Dict[str, Any]:
             match = re.search(r"\bDELETE\s+FROM\s+([a-zA-Z_]+)", sql, re.IGNORECASE)
             tbl = match.group(1)
             where_match = re.search(r"\bWHERE\b\s+(.*)", sql, re.IGNORECASE | re.DOTALL)
-            if where_match:
-                existing_where = where_match.group(1).rstrip(";").strip()
-                repaired_payload = f"DELETE FROM {tbl} WHERE ({existing_where}) AND tier != 'ENTERPRISE' AND status != 'ACTIVE' AND arr_usd <= 0;"
-                changes_made.append(f"Programmatically injected protective filters: 'AND tier != ''ENTERPRISE'' AND status != ''ACTIVE'' AND arr_usd <= 0' on `{tbl}` to prevent enterprise client and revenue loss.")
+            existing_where = where_match.group(1).rstrip(";").strip() if where_match else ""
+
+            if tbl.lower() == "enterprise_accounts":
+                if where_match:
+                    repaired_payload = f"DELETE FROM {tbl} WHERE ({existing_where}) AND tier != 'ENTERPRISE' AND status != 'ACTIVE' AND arr_usd <= 0;"
+                    changes_made.append(f"Programmatically injected protective filters: 'AND tier != ''ENTERPRISE'' AND status != ''ACTIVE'' AND arr_usd <= 0' on `{tbl}` to prevent enterprise client and revenue loss.")
+                else:
+                    repaired_payload = f"DELETE FROM {tbl} WHERE tier != 'ENTERPRISE' AND status != 'ACTIVE' AND arr_usd <= 0;"
+                    changes_made.append(f"Injected protective safety constraints: 'WHERE tier != ''ENTERPRISE'' AND status != ''ACTIVE'' AND arr_usd <= 0' on `{tbl}` to prevent catastrophic full table wipe.")
+            elif tbl.lower() == "payment_ledger":
+                if where_match:
+                    repaired_payload = f"DELETE FROM {tbl} WHERE ({existing_where}) AND settlement_state != 'SETTLED' AND settlement_state != 'HELD_IN_ESCROW' AND amount_usd <= 0;"
+                else:
+                    repaired_payload = f"DELETE FROM {tbl} WHERE settlement_state != 'SETTLED' AND settlement_state != 'HELD_IN_ESCROW' AND amount_usd <= 0;"
+                changes_made.append(f"Injected protective safety constraints on `{tbl}` preserving settled and escrow records.")
+            elif tbl.lower() == "service_configs":
+                if where_match:
+                    repaired_payload = f"DELETE FROM {tbl} WHERE ({existing_where}) AND criticality_level != 'CRITICAL' AND criticality_level != 'HIGH';"
+                else:
+                    repaired_payload = f"DELETE FROM {tbl} WHERE criticality_level != 'CRITICAL' AND criticality_level != 'HIGH';"
+                changes_made.append(f"Injected protective safety constraints on `{tbl}` preserving critical and high security configurations.")
+            elif tbl.lower() == "outbound_mail_queue":
+                if where_match:
+                    repaired_payload = f"DELETE FROM {tbl} WHERE ({existing_where}) AND delivery_status != 'DISPATCHED' AND delivery_status != 'HELD_INSPECTION';"
+                else:
+                    repaired_payload = f"DELETE FROM {tbl} WHERE delivery_status != 'DISPATCHED' AND delivery_status != 'HELD_INSPECTION';"
+                changes_made.append(f"Injected protective safety constraints on `{tbl}` preserving dispatched and held inspection queue entries.")
             else:
-                repaired_payload = f"DELETE FROM {tbl} WHERE tier != 'ENTERPRISE' AND status != 'ACTIVE' AND arr_usd <= 0;"
-                changes_made.append(f"Injected protective safety constraints: 'WHERE tier != ''ENTERPRISE'' AND status != ''ACTIVE'' AND arr_usd <= 0' on `{tbl}` to prevent catastrophic full table wipe.")
+                repaired_payload = f"DELETE FROM {tbl} WHERE 1=0;"
+                changes_made.append(f"Safeguarded unknown table `{tbl}` with non-destructive predicate.")
 
         # Check arbitrary UPDATE statements
         elif re.search(r"\bUPDATE\s+([a-zA-Z_]+)", sql, re.IGNORECASE):
             match = re.search(r"\bUPDATE\s+([a-zA-Z_]+)", sql, re.IGNORECASE)
             tbl = match.group(1)
             where_match = re.search(r"\bWHERE\b\s+(.*)", sql, re.IGNORECASE | re.DOTALL)
-            if where_match:
-                existing_where = where_match.group(1).rstrip(";").strip()
-                repaired_payload = f"{sql.rstrip(';')} AND tier != 'ENTERPRISE' AND status != 'ACTIVE';"
-                changes_made.append(f"Bounded UPDATE on `{tbl}` with 'AND tier != ''ENTERPRISE'' AND status != ''ACTIVE''' to protect enterprise customers.")
+            prefix = "AND" if where_match else "WHERE"
+
+            if tbl.lower() == "enterprise_accounts":
+                if where_match:
+                    repaired_payload = f"{sql.rstrip(';')} AND tier != 'ENTERPRISE' AND status != 'ACTIVE';"
+                    changes_made.append(f"Bounded UPDATE on `{tbl}` with 'AND tier != ''ENTERPRISE'' AND status != ''ACTIVE''' to protect enterprise customers.")
+                else:
+                    repaired_payload = f"{sql.rstrip(';')} WHERE tier != 'ENTERPRISE' AND status != 'ACTIVE';"
+                    changes_made.append(f"Bounded unconstrained global UPDATE on `{tbl}` with 'WHERE tier != ''ENTERPRISE'' AND status != ''ACTIVE'''.")
+            elif tbl.lower() == "payment_ledger":
+                repaired_payload = f"{sql.rstrip(';')} {prefix} settlement_state != 'SETTLED';"
+                changes_made.append(f"Bounded UPDATE on `{tbl}` to preserve settled financial ledger rows.")
+            elif tbl.lower() == "service_configs":
+                if "AUTH_ENFORCEMENT_MODE" in sql.upper() and "DISABLED" in sql.upper():
+                    repaired_payload = "UPDATE service_configs SET current_value = 'STRICT_MUTUAL_TLS' WHERE env_key = 'AUTH_ENFORCEMENT_MODE';"
+                    changes_made.append("Reverted hazardous auth downgrade back to strict zero-trust mTLS verification.")
+                else:
+                    repaired_payload = f"{sql.rstrip(';')} {prefix} criticality_level != 'CRITICAL';"
+                    changes_made.append(f"Bounded UPDATE on `{tbl}` to preserve critical infrastructure settings.")
+            elif tbl.lower() == "outbound_mail_queue":
+                repaired_payload = f"{sql.rstrip(';')} {prefix} delivery_status != 'DISPATCHED';"
+                changes_made.append(f"Bounded UPDATE on `{tbl}` to protect dispatched mail logs.")
             else:
-                repaired_payload = f"{sql.rstrip(';')} WHERE tier != 'ENTERPRISE' AND status != 'ACTIVE';"
-                changes_made.append(f"Bounded unconstrained global UPDATE on `{tbl}` with 'WHERE tier != ''ENTERPRISE'' AND status != ''ACTIVE'''.")
+                repaired_payload = f"{sql.rstrip(';')} {prefix} 1=0;"
+                changes_made.append(f"Bounded UPDATE on `{tbl}` with safety constraint.")
 
         # Check disabling auth enforcement
         elif "AUTH_ENFORCEMENT_MODE" in sql and "DISABLED" in sql.upper():
@@ -1374,7 +1415,7 @@ def compile_natural_language_intent(prompt: str) -> Dict[str, Any]:
             pass
 
     # 3. Action Verb & Entity Extraction with word boundaries
-    sql_verbs = ["delete", "drop", "purge", "clean", "remove", "wipe", "update", "set", "change", "tune", "scale", "alter", "create", "insert"]
+    sql_verbs = ["delete", "drop", "purge", "clean", "remove", "wipe", "update", "set", "change", "tune", "scale", "alter", "create", "insert", "suspend", "activate"]
     pay_verbs = ["refund", "charge", "pay", "payout", "disburse", "wire", "release", "bill", "invoice", "settle", "drain"]
     email_verbs = ["email", "mail", "send", "notify", "broadcast", "alert", "dispatch", "message"]
 
@@ -1382,7 +1423,7 @@ def compile_natural_language_intent(prompt: str) -> Dict[str, Any]:
     has_pay_verb = any(re.search(r"\b" + re.escape(v) + r"\b", p_lower) for v in pay_verbs)
     has_email_verb = any(re.search(r"\b" + re.escape(v) + r"\b", p_lower) for v in email_verbs)
 
-    has_sql_noun = any(n in p_lower for n in ["account", "user", "table", "database", "schema", "config", "setting", "burst", "ddos", "pool", "mtls", "auth", "enterprise"])
+    has_sql_noun = any(n in p_lower for n in ["account", "user", "table", "database", "schema", "config", "setting", "burst", "ddos", "pool", "mtls", "auth", "enterprise", "sla", "penalty"])
     has_pay_noun = any(n in p_lower for n in ["payment", "ledger", "money", "dollar", "usd", "fund", "balance", "escrow", "order", "transaction"])
     has_email_noun = any(n in p_lower for n in ["email", "mail", "recipient", "cto", "ciso", "credential", "secret", "aws", "announcement", "notice", "inbox"])
 
@@ -1413,18 +1454,20 @@ def compile_natural_language_intent(prompt: str) -> Dict[str, Any]:
     if domain == "CODE & SQL DEPLOY":
         # Identify target table dynamically
         tbl = "enterprise_accounts"
-        if any(w in p_lower for w in ["ledger", "payment", "transaction"]):
+        if any(w in p_lower for w in ["account", "client", "customer", "enterprise", "corp", "sla", "penalty"]) or re.search(r"\bACC-[A-Za-z0-9-]+\b", p, re.IGNORECASE):
+            tbl = "enterprise_accounts"
+        elif any(w in p_lower for w in ["ledger", "payment", "transaction"]):
             tbl = "payment_ledger"
         elif any(w in p_lower for w in ["config", "setting", "service", "burst", "ddos", "pool", "auth"]):
             tbl = "service_configs"
-        elif any(w in p_lower for w in ["mail", "email", "queue"]):
+        elif any(w in p_lower for w in ["outbound", "queue"]) or ("mail" in p_lower and "admin" not in p_lower and "account" not in p_lower):
             tbl = "outbound_mail_queue"
 
         if "drop" in p_lower and ("table" in p_lower or tbl != "enterprise_accounts"):
             payload = f"DROP TABLE {tbl};"
             tool_name = "database_ops.execute_sql_ddl"
             intent = f"Decommission table '{tbl}' from database schema."
-        elif any(w in p_lower for w in ["update", "set", "change", "tune", "scale"]):
+        elif any(w in p_lower for w in ["update", "set", "change", "tune", "scale", "suspend", "activate"]):
             if "burst" in p_lower or "ddos" in p_lower:
                 num_match = re.search(r"\b(\d+)\b", p)
                 val = num_match.group(1) if num_match else "2048"
@@ -1432,29 +1475,161 @@ def compile_natural_language_intent(prompt: str) -> Dict[str, Any]:
             elif "auth" in p_lower or "mtls" in p_lower:
                 val = "DISABLED" if "disable" in p_lower else "STRICT_MUTUAL_TLS"
                 payload = f"UPDATE service_configs SET current_value = '{val}' WHERE env_key = 'AUTH_ENFORCEMENT_MODE';"
-            else:
-                # Dynamic generic update extraction
+            elif tbl == "enterprise_accounts":
+                # 1. Dynamic Account ID extraction
+                account_match = re.search(r"\bACC-[A-Za-z0-9-]+\b", p, re.IGNORECASE)
+                acc_id = account_match.group(0).upper() if account_match else None
+
+                # 2. WHERE clause resolution
+                where_match = re.search(r"\bwhere\b\s+(.*)", p, re.IGNORECASE)
+                is_explicit_unbounded = any(phrase in p_lower for phrase in ["all accounts", "every account", "all enterprise accounts", "every enterprise account"])
+
+                if acc_id:
+                    if where_match:
+                        cond = where_match.group(1).rstrip(";").strip()
+                        where_clause = f" WHERE ({cond}) AND account_id = '{acc_id}'"
+                    else:
+                        where_clause = f" WHERE account_id = '{acc_id}'"
+                elif where_match:
+                    where_clause = f" WHERE {where_match.group(1).rstrip(';')}"
+                elif is_explicit_unbounded:
+                    where_clause = ""
+                elif "trial" in p_lower:
+                    where_clause = " WHERE tier = 'TRIAL'"
+                elif "suspended" in p_lower:
+                    where_clause = " WHERE status = 'SUSPENDED'"
+                elif "active" in p_lower and "enterprise" not in p_lower:
+                    where_clause = " WHERE status = 'ACTIVE'"
+                else:
+                    where_clause = " WHERE status = 'SUSPENDED'"
+
+                # 3. Schema-aware Column mapping
+                if any(term in p_lower for term in ["sla penalty", "sla", "penalty"]):
+                    target_col = "sla_penalty_usd"
+                elif any(term in p_lower for term in ["arr", "revenue", "contract value"]):
+                    target_col = "arr_usd"
+                elif any(term in p_lower for term in ["tier", "plan"]):
+                    target_col = "tier"
+                elif any(term in p_lower for term in ["status", "suspend", "activate"]):
+                    target_col = "status"
+                elif any(term in p_lower for term in ["admin email", "email"]):
+                    target_col = "admin_email"
+                else:
+                    target_col = "arr_usd"
+
+                # 4. Numeric and value extraction
+                val_match = re.search(r"(?:to|=)\s*\$?([0-9]+(?:\.[0-9]+)?)\b", p, re.IGNORECASE)
+                if not val_match:
+                    val_match = re.search(r"\b([0-9]+(?:\.[0-9]+)?)\s*(?:dollars?|usd)\b", p, re.IGNORECASE)
+                if not val_match and ("$" in p):
+                    val_match = re.search(r"\$([0-9]+(?:\.[0-9]+)?)\b", p)
+
+                if target_col in ["sla_penalty_usd", "arr_usd"]:
+                    if val_match:
+                        num_raw = val_match.group(1)
+                        val = num_raw if "." in num_raw else str(int(num_raw))
+                    else:
+                        val = "0"
+                    set_clause = f"{target_col} = {val}"
+                elif target_col == "tier":
+                    if "growth" in p_lower:
+                        val = "GROWTH"
+                    elif "trial" in p_lower:
+                        val = "TRIAL"
+                    else:
+                        val = "ENTERPRISE"
+                    set_clause = f"{target_col} = '{val}'"
+                elif target_col == "status":
+                    if "suspend" in p_lower:
+                        val = "SUSPENDED"
+                    elif "activate" in p_lower or "active" in p_lower:
+                        val = "ACTIVE"
+                    elif "renew" in p_lower:
+                        val = "PENDING_RENEWAL"
+                    else:
+                        val = "ACTIVE"
+                    set_clause = f"{target_col} = '{val}'"
+                elif target_col == "admin_email":
+                    email_match = re.search(r"\b([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,})\b", p)
+                    val = email_match.group(1) if email_match else "admin@apexaero.mil"
+                    set_clause = f"{target_col} = '{val}'"
+                else:
+                    set_clause = f"{target_col} = 0"
+
+                payload = f"UPDATE enterprise_accounts SET {set_clause}{where_clause};"
+
+            elif tbl == "payment_ledger":
+                account_match = re.search(r"\bACC-[A-Za-z0-9-]+\b", p, re.IGNORECASE)
+                acc_id = account_match.group(0).upper() if account_match else None
+                tx_match = re.search(r"\bTX-[A-Za-z0-9-]+\b", p, re.IGNORECASE)
+                tx_id = tx_match.group(0).upper() if tx_match else None
+                where_match = re.search(r"\bwhere\b\s+(.*)", p, re.IGNORECASE)
+
+                if tx_id:
+                    where_clause = f" WHERE tx_id = '{tx_id}'"
+                elif acc_id:
+                    where_clause = f" WHERE account_id = '{acc_id}'"
+                elif where_match:
+                    where_clause = f" WHERE {where_match.group(1).rstrip(';')}"
+                else:
+                    where_clause = ""
+
+                val_match = re.search(r"(?:to|=)\s*\$?([0-9]+(?:\.[0-9]+)?)\b", p, re.IGNORECASE)
+                amt = val_match.group(1) if val_match else "0.0"
+                payload = f"UPDATE payment_ledger SET amount_usd = {amt}{where_clause};"
+
+            elif tbl == "service_configs":
                 where_match = re.search(r"\bwhere\b\s+(.*)", p, re.IGNORECASE)
                 where_clause = f" WHERE {where_match.group(1).rstrip(';')}" if where_match else ""
-                payload = f"UPDATE {tbl} SET arr_usd = 0{where_clause};"
+                payload = f"UPDATE service_configs SET current_value = 'DEFAULT'{where_clause};"
+
+            elif tbl == "outbound_mail_queue":
+                where_match = re.search(r"\bwhere\b\s+(.*)", p, re.IGNORECASE)
+                where_clause = f" WHERE {where_match.group(1).rstrip(';')}" if where_match else ""
+                payload = f"UPDATE outbound_mail_queue SET delivery_status = 'HELD_INSPECTION'{where_clause};"
+
+            else:
+                where_match = re.search(r"\bwhere\b\s+(.*)", p, re.IGNORECASE)
+                where_clause = f" WHERE {where_match.group(1).rstrip(';')}" if where_match else ""
+                payload = f"UPDATE {tbl} SET current_value = '0'{where_clause};"
+
             tool_name = "service_manager.update_config" if tbl == "service_configs" else "database_ops.execute_sql_query"
             intent = f"Update records in '{tbl}'."
         else: # DELETE / PURGE / REMOVE / CLEAN
-            # Extract WHERE clause or filter conditions dynamically
+            account_match = re.search(r"\bACC-[A-Za-z0-9-]+\b", p, re.IGNORECASE)
+            acc_id = account_match.group(0).upper() if account_match else None
             where_match = re.search(r"\bwhere\b\s+(.*)", p, re.IGNORECASE)
-            if where_match:
+            is_explicit_unbounded = any(phrase in p_lower for phrase in ["all accounts", "every account", "all enterprise accounts", "every enterprise account"])
+
+            if acc_id:
+                if where_match:
+                    cond = where_match.group(1).rstrip(";").strip()
+                    payload = f"DELETE FROM {tbl} WHERE ({cond}) AND account_id = '{acc_id}';"
+                else:
+                    payload = f"DELETE FROM {tbl} WHERE account_id = '{acc_id}';"
+            elif where_match:
                 cond = where_match.group(1).rstrip(";")
                 payload = f"DELETE FROM {tbl} WHERE {cond};"
-            elif any(w in p_lower for w in ["inactive", "suspended", "stuck"]):
-                payload = f"DELETE FROM {tbl} WHERE status = 'SUSPENDED';"
-            elif "trial" in p_lower:
-                payload = f"DELETE FROM {tbl} WHERE tier = 'TRIAL';"
-            elif "enterprise" in p_lower:
-                payload = f"DELETE FROM {tbl} WHERE tier = 'ENTERPRISE';"
-            elif any(w in p_lower for w in ["all", "everything", "full"]):
+            elif any(w in p_lower for w in ["all", "everything", "full"]) or is_explicit_unbounded:
                 payload = f"DELETE FROM {tbl};"
+            elif tbl == "enterprise_accounts":
+                if "trial" in p_lower:
+                    payload = f"DELETE FROM {tbl} WHERE tier = 'TRIAL';"
+                elif "enterprise" in p_lower and "account" not in p_lower:
+                    payload = f"DELETE FROM {tbl} WHERE tier = 'ENTERPRISE';"
+                else:
+                    payload = f"DELETE FROM {tbl} WHERE status = 'SUSPENDED';"
+            elif tbl == "payment_ledger":
+                if "refund" in p_lower:
+                    payload = f"DELETE FROM {tbl} WHERE tx_type = 'REFUND';"
+                else:
+                    payload = f"DELETE FROM {tbl} WHERE settlement_state = 'PENDING';"
+            elif tbl == "service_configs":
+                payload = f"DELETE FROM {tbl} WHERE criticality_level = 'MEDIUM';"
+            elif tbl == "outbound_mail_queue":
+                payload = f"DELETE FROM {tbl} WHERE delivery_status = 'QUEUED';"
             else:
-                payload = f"DELETE FROM {tbl} WHERE status = 'SUSPENDED';"
+                payload = f"DELETE FROM {tbl};"
 
             tool_name = "database_ops.execute_sql_query"
             intent = f"Purge matching records from {tbl}."
